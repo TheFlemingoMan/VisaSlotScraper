@@ -1,13 +1,18 @@
+from flask import Flask
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 import requests
 import time
+import tempfile
+import os
+
+app = Flask(__name__)
 
 # Telegram Bot credentials
 TELEGRAM_BOT_TOKEN = '7692840933:AAH2VczNvfH68Q_NgSLXzcIloHYITeSqY8A'
-TELEGRAM_CHAT_ID = '-4776470301'  # Use correct ID from getUpdates response
+TELEGRAM_CHAT_ID = '-4776470301' # Use correct ID from getUpdates response
 
 # List of URLs to check
 URLS = [
@@ -28,15 +33,18 @@ def send_telegram_alert(message):
     except requests.exceptions.RequestException as e:
         print(f"❗ Error sending message: {e}")
 
-
 def get_data(url):
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')  # Run in headless mode
     options.add_argument('--disable-blink-features=AutomationControlled')
-    
+
+    # Create a temporary directory for user data
+    user_data_dir = tempfile.mkdtemp()
+    options.add_argument(f'--user-data-dir={user_data_dir}')
+
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
     driver.get(url)
-    
+
     try:
         slots_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[1]")
         visa_type_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[3]")
@@ -61,6 +69,16 @@ def get_data(url):
         print(f"❌ [{url}] Failed to retrieve data. Error: {e}")
     finally:
         driver.quit()
+        # Clean up the temporary directory
+        try:
+            os.rmdir(user_data_dir)
+        except Exception as e:
+            print(f"❌ Failed to remove temporary directory. Error: {e}")
+
+# Health check route
+@app.route('/health', methods=['GET'])
+def health_check():
+    return "OK", 200
 
 # Main logic
 def main():
@@ -68,6 +86,11 @@ def main():
         get_data(url)
 
 if __name__ == "__main__":
+    # Start the Flask server in a separate thread
+    from threading import Thread
+    thread = Thread(target=lambda: app.run(host='0.0.0.0', port=8000))
+    thread.start()
+
     while True:
         main()
-        time.sleep(30)  # Check every 5 minutes
+        time.sleep(30)  # Check every 30 seconds
