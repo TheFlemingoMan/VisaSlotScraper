@@ -7,12 +7,13 @@ import requests
 import time
 import tempfile
 import os
+from threading import Thread
 
 app = Flask(__name__)
 
 # Telegram Bot credentials
 TELEGRAM_BOT_TOKEN = '7692840933:AAH2VczNvfH68Q_NgSLXzcIloHYITeSqY8A'
-TELEGRAM_CHAT_ID = '-4776470301' # Use correct ID from getUpdates response
+TELEGRAM_CHAT_ID = '-4776470301'  # Use correct ID from getUpdates response
 
 # List of URLs to check
 URLS = [
@@ -38,7 +39,7 @@ def get_data(url):
     options.add_argument('--headless')  # Run in headless mode
     options.add_argument('--disable-blink-features=AutomationControlled')
 
-    # Create a temporary directory for user data
+    # Create a unique temporary directory for user data
     user_data_dir = tempfile.mkdtemp()
     options.add_argument(f'--user-data-dir={user_data_dir}')
 
@@ -87,7 +88,6 @@ def main():
 
 if __name__ == "__main__":
     # Start the Flask server in a separate thread
-    from threading import Thread
     thread = Thread(target=lambda: app.run(host='0.0.0.0', port=8000))
     thread.start()
 
