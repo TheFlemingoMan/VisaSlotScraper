@@ -6,6 +6,7 @@ from webdriver_manager.chrome import ChromeDriverManager
 import requests
 import time
 import tempfile
+import shutil
 import os
 from threading import Thread
 
@@ -34,6 +35,7 @@ def send_telegram_alert(message):
     except requests.exceptions.RequestException as e:
         print(f"❗ Error sending message: {e}")
 
+# Function to retrieve data from URLs
 def get_data(url):
     options = webdriver.ChromeOptions()
     options.add_argument('--headless')  # Run in headless mode
@@ -44,15 +46,18 @@ def get_data(url):
     options.add_argument(f'--user-data-dir={user_data_dir}')
 
     driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-    driver.get(url)
 
     try:
+        driver.get(url)
+
+        # Extract data
         slots_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[1]")
         visa_type_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[3]")
         month_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[4]")
         date_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[5]")
         location_element = driver.find_element(By.XPATH, "/html/body/main/details[1]/figure/table/tbody/tr/td[2]")
 
+        # Extract text and clean up
         slots = slots_element.text.strip()
         visa_type = visa_type_element.text.strip()
         month_val = month_element.text.strip()
@@ -61,18 +66,20 @@ def get_data(url):
 
         print(f"[{url}] Visa Type: {visa_type}, Location: {location_val}, Slots: {slots}, Month: {month_val}, Dates: {date_val}")
 
-        if int(slots) == 0:
+        # Send alert if slots are available
+        if int(slots) > 0:
             send_telegram_alert(
                 f"🟢 {location_val} - {slots} slots available for {visa_type} in {month_val} on {date_val}"
             )
-            
+
     except Exception as e:
         print(f"❌ [{url}] Failed to retrieve data. Error: {e}")
+    
     finally:
+        # Clean up driver and temporary directory
         driver.quit()
-        # Clean up the temporary directory
         try:
-            os.rmdir(user_data_dir)
+            shutil.rmtree(user_data_dir)
         except Exception as e:
             print(f"❌ Failed to remove temporary directory. Error: {e}")
 
@@ -91,6 +98,7 @@ if __name__ == "__main__":
     thread = Thread(target=lambda: app.run(host='0.0.0.0', port=8000))
     thread.start()
 
+    # Continuous monitoring loop
     while True:
         main()
         time.sleep(30)  # Check every 30 seconds
